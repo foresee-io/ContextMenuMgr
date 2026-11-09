@@ -24,7 +24,9 @@ param(
 
     [string] $PublishRoot = '',
 
-    [string] $DistRoot = ''
+    [string] $DistRoot = '',
+
+    [string] $ProbeHostPlatforms = ''
 )
 
 Set-StrictMode -Version Latest
@@ -137,7 +139,8 @@ try {
                 -DistRoot $distRoot `
                 -Version $Version `
                 -ArtifactProductName $artifactProductName `
-                -NuGetConfig $nuGetConfig
+                -NuGetConfig $nuGetConfig `
+                -ProbeHostPlatforms $ProbeHostPlatforms
         }
         default {
             throw "Unsupported build target kind '$Kind'."

@@ -729,7 +729,8 @@ function Publish-Application {
         [Parameter(Mandatory)] [string] $NuGetConfig,
         [Parameter(Mandatory)] [string] $PublishGroup,
         [Parameter(Mandatory)] [string] $Version,
-        [Parameter(Mandatory)] [ValidateSet("Installer", "Portable")] [string] $PackageKind
+        [Parameter(Mandatory)] [ValidateSet("Installer", "Portable")] [string] $PackageKind,
+        [string] $ProbeHostPlatforms = ''
     )
 
     $distributionOptions = Get-DistributionModeOptions -DistributionMode $DistributionMode
@@ -760,7 +761,25 @@ function Publish-Application {
         -InformationalVersion $Version
 
     if ($Platform -eq "anycpu") {
-        $frontendPublishArguments += "-p:NativeProbeHostPlatforms=Win32%2Cx64%2CARM64"
+        # The portable payload carries exactly the native ProbeHost architectures
+        # implied by the build scope (-Platforms). A direct Build-Target.ps1
+        # invocation without that scope keeps the historical full set.
+        if ([string]::IsNullOrWhiteSpace($ProbeHostPlatforms)) {
+            $portableProbeHostLabels = @("x86", "x64", "arm64")
+        }
+        else {
+            # Emit the canonical order used by the project file, which recognizes
+            # exactly "Win32,x64" (Debug scope) and "Win32,x64,ARM64" (full scope).
+            $probeHostLabelOrder = @{ "x86" = 0; "x64" = 1; "arm64" = 2 }
+            $portableProbeHostLabels = @($ProbeHostPlatforms.Split(",") |
+                ForEach-Object { $_.Trim() } |
+                Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+                Sort-Object -Property { $probeHostLabelOrder[$_] })
+        }
+
+        $portableProbeHostPlatforms = @($portableProbeHostLabels |
+            ForEach-Object { Get-NativeProbeHostPlatform -Label $_ }) -join "%2C"
+        $frontendPublishArguments += "-p:NativeProbeHostPlatforms=$portableProbeHostPlatforms"
     }
     else {
         $frontendPublishArguments += "-p:SkipProbeHostArchitectureBuild=true"
@@ -829,7 +848,7 @@ function Publish-Application {
     }
 
     if ($Platform -eq "anycpu" -and $probeHostLabels.Count -eq 0) {
-        $probeHostLabels = @("x86", "x64", "arm64")
+        $probeHostLabels = $portableProbeHostLabels
     }
 
     $thirdPartyNoticeDir = Join-Path $publishDir "ThirdPartyNotices"
@@ -1130,7 +1149,8 @@ function Invoke-PortableFrameworkDependentBuildTarget {
         [Parameter(Mandatory)] [string] $DistRoot,
         [Parameter(Mandatory)] [string] $Version,
         [Parameter(Mandatory)] [string] $ArtifactProductName,
-        [Parameter(Mandatory)] [string] $NuGetConfig
+        [Parameter(Mandatory)] [string] $NuGetConfig,
+        [string] $ProbeHostPlatforms = ''
     )
 
     $publishDir = Publish-Application `
@@ -1145,7 +1165,8 @@ function Invoke-PortableFrameworkDependentBuildTarget {
         -NuGetConfig $NuGetConfig `
         -PublishGroup "portable" `
         -Version $Version `
-        -PackageKind "Portable"
+        -PackageKind "Portable" `
+        -ProbeHostPlatforms $ProbeHostPlatforms
 
     return New-PortableArchive `
         -PublishDir $publishDir `

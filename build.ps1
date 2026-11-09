@@ -45,7 +45,8 @@ function Start-BuildTargetProcess {
         [Parameter(Mandatory)] [string] $Version,
         [Parameter(Mandatory)] [string] $LogPath,
         [Parameter(Mandatory)] [string] $PublishRoot,
-        [Parameter(Mandatory)] [string] $DistRoot
+        [Parameter(Mandatory)] [string] $DistRoot,
+        [string] $ProbeHostPlatforms = ''
     )
 
     $arguments = @(
@@ -61,7 +62,13 @@ function Start-BuildTargetProcess {
         '-LogPath', $LogPath,
         '-PublishRoot', $PublishRoot,
         '-DistRoot', $DistRoot
-    ) | ForEach-Object { ConvertTo-ProcessArgument -Value ([string] $_) }
+    )
+
+    if ($Task.Kind -eq 'portable' -and -not [string]::IsNullOrWhiteSpace($ProbeHostPlatforms)) {
+        $arguments += @('-ProbeHostPlatforms', $ProbeHostPlatforms)
+    }
+
+    $arguments = $arguments | ForEach-Object { ConvertTo-ProcessArgument -Value ([string] $_) }
 
     $process = Start-Process `
         -FilePath $PowerShellPath `
@@ -157,6 +164,20 @@ New-Item -ItemType Directory -Path $logsRoot -Force | Out-Null
 
 $version = Get-BuildVersion -ProjectPath $frontendProject -Configuration $Configuration
 
+# The portable package mirrors the architecture scope of -Platforms: the union
+# of the native ProbeHost labels implied by every selected platform. The default
+# three-platform selection keeps the historical Win32,x64,ARM64 portable payload.
+$portableProbeHostLabels = New-Object System.Collections.Generic.List[string]
+foreach ($platform in $Platforms) {
+    foreach ($probeHostArchitecture in @(Get-ProbeHostArchitectureMap -Platform $platform)) {
+        $probeHostLabel = [string] $probeHostArchitecture.Label
+        if (-not $portableProbeHostLabels.Contains($probeHostLabel)) {
+            $portableProbeHostLabels.Add($probeHostLabel) | Out-Null
+        }
+    }
+}
+$portableProbeHostPlatforms = @($portableProbeHostLabels) -join ','
+
 $tasks = New-Object System.Collections.Generic.List[object]
 foreach ($distributionMode in $DistributionModes) {
     foreach ($platform in $Platforms) {
@@ -212,7 +233,8 @@ while ($pending.Count -gt 0 -or $running.Count -gt 0) {
             -Version $version `
             -LogPath $logPath `
             -PublishRoot $publishRoot `
-            -DistRoot $distRoot
+            -DistRoot $distRoot `
+            -ProbeHostPlatforms $portableProbeHostPlatforms
 
         $running.Add([pscustomobject]@{
             Task = $task
