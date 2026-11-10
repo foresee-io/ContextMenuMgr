@@ -15,7 +15,8 @@
     <Description>Windows context menu manager frontend for Context Menu Manager Plus.</Description>
     <Company>PLFJY</Company>
     <BackendTargetFramework>net10.0-windows10.0.17763.0</BackendTargetFramework>
-    <BackendOutputDir>$(MSBuildThisFileDirectory)..\artifacts\backend\$(Configuration)\$(BackendTargetFramework)\</BackendOutputDir>
+    <BackendOutputDir Condition="'$(Platform)' == 'AnyCPU' or '$(Platform)' == ''">$(MSBuildThisFileDirectory)..\artifacts\backend\$(Configuration)\$(BackendTargetFramework)\</BackendOutputDir>
+    <BackendOutputDir Condition="'$(Platform)' != 'AnyCPU' and '$(Platform)' != ''">$(MSBuildThisFileDirectory)..\artifacts\backend\$(Platform)\$(Configuration)\$(BackendTargetFramework)\</BackendOutputDir>
     <NativeProbeHostProject>$(MSBuildThisFileDirectory)..\ContextMenuMgr.ProbeHost\ContextMenuMgr.ProbeHost.vcxproj</NativeProbeHostProject>
     <NativeProbeHostOutputRoot>$(MSBuildThisFileDirectory)..\artifacts\probehost-native\$(Configuration)\</NativeProbeHostOutputRoot>
     <NativeProbeHostIntermediateRoot>$(NativeProbeHostOutputRoot)obj\</NativeProbeHostIntermediateRoot>
